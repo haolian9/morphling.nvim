@@ -23,8 +23,6 @@ local subprocess = require("infra.subprocess")
 local api = vim.api
 local uv = vim.loop
 
-local mktempfile = os.tmpname
-
 local resolve_stylua_config
 do
   local function find(root)
@@ -45,8 +43,10 @@ do
   end
 end
 
+---@alias morphling.Runner fun(fpath: string): boolean
+
 -- all runners should modify the file inplace
----@type { [string]: fun(fpath: string): boolean}
+---@type {[string]: morphling.Runner}
 local runners = {
   zig = function(fpath)
     local cp = subprocess.run("zig", { args = { "fmt", "--ast-check", fpath } })
@@ -84,7 +84,8 @@ local runners = {
   end,
 }
 
--- {ft: {profile: [(runner-name, runner)]}}
+--{ft: {profile: [(runner-name, runner)]}}
+---@type {[string]: {[string]: {[1]: string, [2]: morphling.Runner}[]}}
 local profiles = {}
 do
   local defines = {
@@ -96,7 +97,7 @@ do
     { "fennel", "default", { "fnlfmt" } },
     { "rust", "default", { "rustfmt" } },
   }
-  for _, def in ipairs(defines) do
+  for def in listlib.iter(defines) do
     local ft, pro, runs = unpack(def)
     if profiles[ft] == nil then profiles[ft] = {} end
     if profiles[ft][pro] ~= nil then error("duplicate definitions for profile " .. pro) end
@@ -108,75 +109,84 @@ do
   end
 end
 
----@param bufnr number
----@param callback fun()
-local function keep_view(bufnr, callback)
-  assert(bufnr)
-
-  -- [(winid, view)]
-  local state = {}
-
-  local bufinfo = vim.fn.getbufinfo(bufnr)[1]
-  assert(bufinfo)
-
-  for winid in listlib.iter(bufinfo.windows) do
-    api.nvim_win_call(winid, function() table.insert(state, { winid, vim.fn.winsaveview() }) end)
-  end
-
-  callback()
-
-  for winid, view in listlib.iter_unpacked(state) do
-    api.nvim_win_call(winid, function() vim.fn.winrestview(view) end)
-  end
-end
-
 local diffpatch
 do
   ---ref: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
 
-  ---@class morphling.Patcher
-  ---@field private bufnr integer
-  ---@field private formatted string[]
-  ---@field private offset integer
-  local Patcher = {}
+  ---@alias morphling.DiffHunk {[1]: integer, [2]: integer, [3]: integer, [4]: integer}
 
-  Patcher.__index = Patcher
+  ---@param bufnr integer
+  ---@param f fun(...)
+  ---@param ... any @params to the f
+  local function keep_view(bufnr, f, ...)
+    assert(bufnr)
 
-  function Patcher:__call(start_a, count_a, start_b, count_b)
-    assert(not (count_a == 0 and count_b == 0))
+    ---@type {[1]: integer, [2]: any}[]  @[(winid, view)]
+    local state = {}
 
-    local lines
-    do
-      local s = start_b
-      if count_b == 0 then
-        lines = {}
-      else
-        lines = fn.tolist(fn.slice(self.formatted, s, s + count_b))
-      end
+    local bufinfo = vim.fn.getbufinfo(bufnr)[1]
+    assert(bufinfo)
+
+    for winid in listlib.iter(bufinfo.windows) do
+      api.nvim_win_call(winid, function() table.insert(state, { winid, vim.fn.winsaveview() }) end)
     end
 
-    do
-      local start, stop
-      if count_a == 0 then -- append
-        start = start_a - 1 + self.offset + 1
-        stop = start
-      elseif count_b == 0 then -- delete
-        start = start_a - 1 + self.offset
-        stop = start + count_a
-      else
-        start = start_a - 1 + self.offset
-        stop = start + count_a
-      end
-      api.nvim_buf_set_lines(self.bufnr, start, stop, false, lines)
-    end
+    f(...)
 
-    self.offset = self.offset + (count_b - count_a)
+    for winid, view in listlib.iter_unpacked(state) do
+      api.nvim_win_call(winid, function() vim.fn.winrestview(view) end)
+    end
+  end
+
+  ---@param bufnr integer
+  ---@param formatted string[]
+  ---@param hunks morphling.DiffHunk[]
+  local function patch(bufnr, formatted, hunks)
+    --todo: inspired by guard.nvim, patching hunks in reverse order uses less state
+    local offset = 0
+    for hunk in listlib.iter(hunks) do
+      local start_a, count_a, start_b, count_b = unpack(hunk)
+      assert(not (count_a == 0 and count_b == 0))
+
+      local lines
+      do
+        local start = start_b
+        if count_b == 0 then
+          lines = {}
+        else
+          lines = fn.tolist(fn.slice(formatted, start, start + count_b))
+        end
+      end
+
+      do
+        local start, stop
+        if count_a == 0 then -- append
+          start = start_a - 1 + offset + 1
+          stop = start
+        elseif count_b == 0 then -- delete
+          start = start_a - 1 + offset
+          stop = start + count_a
+        else
+          start = start_a - 1 + offset
+          stop = start + count_a
+        end
+        api.nvim_buf_set_lines(bufnr, start, stop, false, lines)
+      end
+
+      offset = offset + (count_b - count_a)
+    end
   end
 
   ---@param bufnr integer
   ---@param formatted string[]
   function diffpatch(bufnr, formatted)
-    local patcher = setmetatable({ bufnr = bufnr, formatted = formatted, offset = 0 }, Patcher)
+    local hunks
+    do
+      local a = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+      local b = table.concat(formatted, "\n")
+      hunks = vim.diff(a, b, { result_type = "indices" })
+      if #hunks == 0 then return jelly.debug("no need to patch") end
+    end
 
     ---todo: Vim:E790: undojoin is not all owed after undo
     -- local bo = prefer.buf(self.bufnr)
@@ -185,9 +195,7 @@ do
     -- vim.cmd.undojoin()
     -- bo.undolevels = undolevels
 
-    local a = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
-    local b = table.concat(formatted, "\n")
-    vim.diff(a, b, { on_hunk = function(...) patcher(...) end })
+    keep_view(bufnr, patch, bufnr, formatted, hunks)
   end
 end
 
@@ -204,17 +212,18 @@ function M.run(bufnr, ft, profile)
   profile = profile or "default"
 
   local runs = dictlib.get(profiles, ft, profile) or {}
-
   if #runs == 0 then return jelly.info("no available formatting runners") end
-
-  local tmpfpath = mktempfile()
 
   jelly.info("using ft=%s, profile=%s, bufnr=%d, runners=%d", ft, profile, bufnr, #runs)
 
-  -- prepare tmpfile
-  if not cthulhu.nvim.dump_buffer(bufnr, tmpfpath) then return jelly.err("failed to dump buffer") end
+  local tmpfpath
+  do -- prepare tmpfile
+    tmpfpath = os.tmpname()
+    if not cthulhu.nvim.dump_buffer(bufnr, tmpfpath) then return jelly.err("failed to dump buf#%d", bufnr) end
+  end
 
-  -- runner pipeline against tmpfile
+  --runner pipeline against tmpfile
+  --todo: avoid blocking here
   for name, run in listlib.iter_unpacked(runs) do
     if not run(tmpfpath) then
       jelly.warn("failed to run %s", name)
@@ -223,17 +232,12 @@ function M.run(bufnr, ft, profile)
     end
   end
 
-  -- sync back & save
-  do
+  do -- sync back & save
     local formatted = {}
     for line in io.lines(tmpfpath) do
       table.insert(formatted, line)
     end
-    keep_view(bufnr, function()
-      diffpatch(bufnr, formatted)
-      -- the reported errors are insane!
-      -- pcall(api.nvim_buf_set_lines, bufnr, 0, -1, false, lines)
-    end)
+    diffpatch(bufnr, formatted)
     api.nvim_buf_call(bufnr, function() ex("silent write") end)
     regulator:update(bufnr)
   end
