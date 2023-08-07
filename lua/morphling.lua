@@ -1,9 +1,9 @@
 --
 -- design choices
 -- * only for files of source code
--- * no communicate with external formatting program
--- * run runners by order, crashing wont make original buffer dirty
--- * suppose all external formatting program do inplace
+-- * no communicating with external formatting programs
+-- * run runners by order, crashing should not make the original buffer dirty
+-- * suppose all external formatting programs format inplace
 --
 
 local M = {}
@@ -204,7 +204,7 @@ local regulator = Regulator(1024)
 ---@param bufnr? integer
 ---@param ft? string
 ---@param profile? string
-function M.run(bufnr, ft, profile)
+function M.morph(bufnr, ft, profile)
   bufnr = bufnr or api.nvim_get_current_buf()
   if regulator:throttled(bufnr) then return jelly.debug("no change") end
 
