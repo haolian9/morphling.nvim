@@ -1,16 +1,16 @@
 an example implementation to format nvim buffers
 
 ## features
-* keep cursor stay where it was during formatting
+* keep cursor where it was during formatting among windows
 * use diff+patch to update the buffer
 * rate limit
 * profiles of formatters
 
 ## design choices
-* only for files of source code
-* no communicating with external formatting program
-* run runners by order, crashing wont make original buffer dirty
-* suppose all external formatting program do inplace
+* only for source files
+* no communicating with external formatting programs
+* run runners by order, crashing should not make the original buffer dirty
+* suppose all external formatting programs format inplace
 
 ## status
 * it just works(tm)
