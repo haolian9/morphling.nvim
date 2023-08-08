@@ -142,7 +142,6 @@ do
   ---@param formatted string[]
   ---@param hunks morphling.DiffHunk[]
   local function patch(bufnr, formatted, hunks)
-    --todo: inspired by guard.nvim, patching hunks in reverse order uses less state
     local offset = 0
     for hunk in listlib.iter(hunks) do
       local start_a, count_a, start_b, count_b = unpack(hunk)
@@ -188,14 +187,18 @@ do
       if #hunks == 0 then return jelly.debug("no need to patch") end
     end
 
-    ---todo: Vim:E790: undojoin is not all owed after undo
-    -- local bo = prefer.buf(self.bufnr)
-    -- local undolevels = bo.undolevels
-    -- bo.undolevels = undolevels
-    -- vim.cmd.undojoin()
-    -- bo.undolevels = undolevels
+    keep_view(bufnr, function()
+      local bo = prefer.buf(bufnr)
+      local undolevels = bo.undolevels
+      --close previous undo block
+      bo.undolevels = undolevels
 
-    keep_view(bufnr, patch, bufnr, formatted, hunks)
+      --no need to wrap buf_set_lines with `undojoin`, as it will not close the undo block
+      patch(bufnr, formatted, hunks)
+
+      --close this undo block
+      bo.undolevels = undolevels
+    end)
   end
 end
 
