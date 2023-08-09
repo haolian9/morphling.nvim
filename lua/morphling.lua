@@ -4,6 +4,7 @@
 -- * no communicating with external formatting programs
 -- * run runners by order, crashing should not make the original buffer dirty
 -- * suppose all external formatting programs format inplace
+-- * it's a blocking operation
 --
 
 local M = {}
@@ -226,7 +227,6 @@ function M.morph(bufnr, ft, profile)
   end
 
   --runner pipeline against tmpfile
-  --todo: avoid blocking here
   for name, run in listlib.iter_unpacked(runs) do
     if not run(tmpfpath) then
       jelly.warn("failed to run %s", name)
