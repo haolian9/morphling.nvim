@@ -10,6 +10,7 @@
 local M = {}
 
 local cthulhu = require("cthulhu")
+local ctx = require("infra.ctx")
 local dictlib = require("infra.dictlib")
 local ex = require("infra.ex")
 local fn = require("infra.fn")
@@ -149,13 +150,11 @@ do
       assert(not (count_a == 0 and count_b == 0))
 
       local lines
-      do
+      if count_b == 0 then
+        lines = {}
+      else
         local start = start_b
-        if count_b == 0 then
-          lines = {}
-        else
-          lines = fn.tolist(fn.slice(formatted, start, start + count_b))
-        end
+        lines = fn.tolist(fn.slice(formatted, start, start + count_b))
       end
 
       do
@@ -189,16 +188,7 @@ do
     end
 
     keep_view(bufnr, function()
-      local bo = prefer.buf(bufnr)
-      local undolevels = bo.undolevels
-      --close previous undo block
-      bo.undolevels = undolevels
-
-      --no need to wrap buf_set_lines with `undojoin`, as it will not close the undo block
-      patch(bufnr, formatted, hunks)
-
-      --close this undo block
-      bo.undolevels = undolevels
+      ctx.undoblock(bufnr, function() patch(bufnr, formatted, hunks) end)
     end)
   end
 end
