@@ -118,29 +118,6 @@ do
   ---@alias morphling.DiffHunk {[1]: integer, [2]: integer, [3]: integer, [4]: integer}
 
   ---@param bufnr integer
-  ---@param f fun(...)
-  ---@param ... any @params to the f
-  local function keep_view(bufnr, f, ...)
-    assert(bufnr)
-
-    ---@type {[1]: integer, [2]: any}[]  @[(winid, view)]
-    local state = {}
-
-    local bufinfo = vim.fn.getbufinfo(bufnr)[1]
-    assert(bufinfo)
-
-    for winid in listlib.iter(bufinfo.windows) do
-      api.nvim_win_call(winid, function() table.insert(state, { winid, vim.fn.winsaveview() }) end)
-    end
-
-    f(...)
-
-    for winid, view in listlib.iter_unpacked(state) do
-      api.nvim_win_call(winid, function() vim.fn.winrestview(view) end)
-    end
-  end
-
-  ---@param bufnr integer
   ---@param formatted string[]
   ---@param hunks morphling.DiffHunk[]
   local function patch(bufnr, formatted, hunks)
@@ -187,7 +164,7 @@ do
       if #hunks == 0 then return jelly.debug("no need to patch") end
     end
 
-    keep_view(bufnr, function()
+    ctx.bufviews(bufnr, function()
       ctx.undoblock(bufnr, function() patch(bufnr, formatted, hunks) end)
     end)
   end
