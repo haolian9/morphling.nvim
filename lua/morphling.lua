@@ -84,6 +84,10 @@ local runners = {
     local cp = subprocess.run("rustfmt", { args = { fpath } })
     return cp.exit_code == 0
   end,
+  gomodifytags = function(fpath)
+    local cp = subprocess.run("gomodifytags", { args = { "-all", "-add-tags", "json", "-w", "-file", fpath } })
+    return cp.exit_code == 0
+  end,
 }
 
 --{ft: {profile: [(runner-name, runner)]}}
@@ -95,12 +99,12 @@ do
     { "zig", "default", { "zig" } },
     { "python", "default", { "isort", "black" } },
     { "go", "default", { "go" } },
+    { "go", "jsontags", { "gomodifytags" } },
     { "c", "default", { "clang-format" } },
     { "fennel", "default", { "fnlfmt" } },
     { "rust", "default", { "rustfmt" } },
   }
-  for def in listlib.iter(defines) do
-    local ft, pro, runs = unpack(def)
+  for ft, pro, runs in listlib.iter_unpacked(defines) do
     if profiles[ft] == nil then profiles[ft] = {} end
     if profiles[ft][pro] ~= nil then error("duplicate definitions for profile " .. pro) end
     profiles[ft][pro] = fn.tolist(fn.map(function(name)
@@ -122,8 +126,7 @@ do
   ---@param hunks morphling.DiffHunk[]
   local function patch(bufnr, formatted, hunks)
     local offset = 0
-    for hunk in listlib.iter(hunks) do
-      local start_a, count_a, start_b, count_b = unpack(hunk)
+    for start_a, count_a, start_b, count_b in listlib.iter_unpacked(hunks) do
       assert(not (count_a == 0 and count_b == 0))
 
       local lines
@@ -215,5 +218,15 @@ function M.morph(bufnr, ft, profile)
   -- cleanup
   uv.fs_unlink(tmpfpath)
 end
+
+M.comp = {
+  ---@param ft string @filetype
+  ---@return string[]
+  available_profiles = function(ft)
+    local avails = profiles[ft]
+    if avails == nil then return {} end
+    return dictlib.keys(avails)
+  end,
+}
 
 return M
