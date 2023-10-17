@@ -1,11 +1,9 @@
---
--- design choices
--- * only for files of source code
--- * no communicating with external formatting programs
--- * run runners by order, crashing should not make the original buffer dirty
--- * suppose all external formatting programs format inplace
--- * it's a blocking operation
---
+--design choices
+--* no stdio with external formatting programs
+--* run formatting programs by order, crashes should not make the original buffer dirty
+--* assume all formatting programs format in-place
+--* it should blocks user input during formatting
+--* it should not block the nvim processes
 
 local M = {}
 
@@ -45,11 +43,11 @@ do
   end
 end
 
----@alias morphling.Runner fun(fpath: string): boolean
+---@alias morphling.Program fun(fpath: string): boolean
 
--- all runners should modify the file inplace
----@type {[string]: morphling.Runner}
-local runners = {
+-- all formatting programs should modify the file inplace
+---@type {[string]: morphling.Program}
+local programs = {
   zig = function(fpath)
     local cp = subprocess.run("zig", { args = { "fmt", "--ast-check", fpath } })
     return cp.exit_code == 0
@@ -90,8 +88,8 @@ local runners = {
   end,
 }
 
---{ft: {profile: [(runner-name, runner)]}}
----@type {[string]: {[string]: {[1]: string, [2]: morphling.Runner}[]}}
+--{ft: {profile: [(program-name, program-handler)]}}
+---@type {[string]: {[string]: {[1]: string, [2]: morphling.Program}[]}}
 local profiles = {}
 do
   local defines = {
@@ -104,14 +102,10 @@ do
     { "fennel", "default", { "fnlfmt" } },
     { "rust", "default", { "rustfmt" } },
   }
-  for ft, pro, runs in listlib.iter_unpacked(defines) do
+  for ft, profile_name, prog_names in listlib.iter_unpacked(defines) do
     if profiles[ft] == nil then profiles[ft] = {} end
-    if profiles[ft][pro] ~= nil then error("duplicate definitions for profile " .. pro) end
-    profiles[ft][pro] = fn.tolist(fn.map(function(name)
-      local r = runners[name]
-      assert(r, "no such runner " .. name)
-      return { name, r }
-    end, runs))
+    if profiles[ft][profile_name] ~= nil then error("duplicate definitions for profile " .. profile_name) end
+    profiles[ft][profile_name] = fn.tolist(fn.map(function(name) return { name, assert(programs[name]) } end, prog_names))
   end
 end
 
@@ -185,10 +179,10 @@ function M.morph(bufnr, ft, profile)
   ft = ft or prefer.bo(bufnr, "filetype")
   profile = profile or "default"
 
-  local runs = dictlib.get(profiles, ft, profile) or {}
-  if #runs == 0 then return jelly.info("no available formatting runners") end
+  local progs = dictlib.get(profiles, ft, profile) or {}
+  if #progs == 0 then return jelly.info("no available formatting programs") end
 
-  jelly.info("using ft=%s, profile=%s, bufnr=%d, runners=%d", ft, profile, bufnr, #runs)
+  jelly.info("using ft=%s, profile=%s, bufnr=%d, progs=%d", ft, profile, bufnr, #progs)
 
   local tmpfpath
   do -- prepare tmpfile
@@ -196,9 +190,9 @@ function M.morph(bufnr, ft, profile)
     if not cthulhu.nvim.dump_buffer(bufnr, tmpfpath) then return jelly.err("failed to dump buf#%d", bufnr) end
   end
 
-  --runner pipeline against tmpfile
-  for name, run in listlib.iter_unpacked(runs) do
-    if not run(tmpfpath) then
+  --progs pipeline against tmpfile
+  for name, prog in listlib.iter_unpacked(progs) do
+    if not prog(tmpfpath) then
       jelly.warn("failed to run %s", name)
       subprocess.tail_logs()
       return
