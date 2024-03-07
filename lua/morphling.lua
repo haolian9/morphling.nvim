@@ -86,6 +86,10 @@ local programs = {
     local cp = subprocess.run("gomodifytags", { args = { "-all", "-add-tags", "json", "-w", "-file", fpath } })
     return cp.exit_code == 0
   end,
+  ["fish-indent"] = function(fpath)
+    local cp = subprocess.run("fish_indent", { args = { "-w", fpath } })
+    return cp.exit_code == 0
+  end,
 }
 
 --{ft: {profile: [(program-name, program-handler)]}}
@@ -101,6 +105,7 @@ do
     { "c", "default", { "clang-format" } },
     { "fennel", "default", { "fnlfmt" } },
     { "rust", "default", { "rustfmt" } },
+    { "fish", "default", { "fish-indent" } },
   }
   for ft, profile_name, prog_names in listlib.iter_unpacked(defines) do
     if profiles[ft] == nil then profiles[ft] = {} end
