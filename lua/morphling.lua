@@ -28,8 +28,8 @@ do
   local function find(root)
     if root == nil then return end
     for _, basename in ipairs({ "stylua.toml", ".stylua.toml" }) do
-      local path = fs.joinpath(root, basename)
-      if fs.exists(path) then return path end
+      local fpath = fs.joinpath(root, basename)
+      if fs.file_exists(fpath) then return fpath end
     end
   end
 
@@ -74,14 +74,6 @@ local programs = {
     local cp = subprocess.run("clang-format", { args = { "-i", fpath } })
     return cp.exit_code == 0
   end,
-  fnlfmt = function(fpath)
-    local cp = subprocess.run("fnlfmt", { args = { "--fix", fpath } })
-    return cp.exit_code == 0
-  end,
-  rustfmt = function(fpath)
-    local cp = subprocess.run("rustfmt", { args = { fpath } })
-    return cp.exit_code == 0
-  end,
   gomodifytags = function(fpath)
     local cp = subprocess.run("gomodifytags", { args = { "-all", "-add-tags", "json", "-w", "-file", fpath } })
     return cp.exit_code == 0
@@ -103,8 +95,6 @@ do
     { "go", "default", { "go" } },
     { "go", "jsontags", { "gomodifytags" } },
     { "c", "default", { "clang-format" } },
-    { "fennel", "default", { "fnlfmt" } },
-    { "rust", "default", { "rustfmt" } },
     { "fish", "default", { "fish-indent" } },
   }
   for ft, profile_name, prog_names in listlib.iter_unpacked(defines) do
