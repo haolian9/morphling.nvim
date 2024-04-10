@@ -200,7 +200,7 @@ function M.morph(bufnr, ft, profile)
       table.insert(formatted, line)
     end
     diffpatch(bufnr, formatted)
-    api.nvim_buf_call(bufnr, function() ex("silent write") end)
+    api.nvim_buf_call(bufnr, function() ex.eval("silent write") end)
     regulator:update(bufnr)
   end
 
