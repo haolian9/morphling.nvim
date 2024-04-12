@@ -139,7 +139,7 @@ do
           start = start_a - 1 + offset
           stop = start + count_a
         end
-        buflines.replaces(bufnr, start, stop, lines)
+        buflines.sets(bufnr, start, stop, lines)
       end
 
       offset = offset + (count_b - count_a)
