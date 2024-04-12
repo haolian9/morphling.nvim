@@ -8,6 +8,7 @@
 local M = {}
 
 local cthulhu = require("cthulhu")
+local buflines = require("infra.buflines")
 local ctx = require("infra.ctx")
 local dictlib = require("infra.dictlib")
 local ex = require("infra.ex")
@@ -138,7 +139,7 @@ do
           start = start_a - 1 + offset
           stop = start + count_a
         end
-        api.nvim_buf_set_lines(bufnr, start, stop, false, lines)
+        buflines.replaces(bufnr, start, stop, lines)
       end
 
       offset = offset + (count_b - count_a)
@@ -150,7 +151,7 @@ do
   function diffpatch(bufnr, formatted)
     local hunks
     do
-      local a = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+      local a = table.concat(buflines.all(bufnr), "\n")
       local b = table.concat(formatted, "\n")
       hunks = vim.diff(a, b, { result_type = "indices" })
       if #hunks == 0 then return jelly.debug("no need to patch") end
