@@ -111,10 +111,10 @@ do
 
   ---@alias morphling.DiffHunk {[1]: integer, [2]: integer, [3]: integer, [4]: integer}
 
-  ---@param bufnr integer
-  ---@param formatted string[]
+  ---@param a_bufnr integer
+  ---@param b_lines string[]
   ---@param hunks morphling.DiffHunk[]
-  local function patch(bufnr, formatted, hunks)
+  local function patch(a_bufnr, b_lines, hunks)
     local offset = 0
     for start_a, count_a, start_b, count_b in listlib.iter_unpacked(hunks) do
       assert(not (count_a == 0 and count_b == 0))
@@ -124,7 +124,7 @@ do
         lines = {}
       else
         local start = start_b
-        lines = fn.tolist(fn.slice(formatted, start, start + count_b))
+        lines = fn.tolist(fn.slice(b_lines, start, start + count_b))
       end
 
       do
@@ -139,26 +139,28 @@ do
           start = start_a - 1 + offset
           stop = start + count_a
         end
-        buflines.sets(bufnr, start, stop, lines)
+        buflines.sets(a_bufnr, start, stop, lines)
       end
 
       offset = offset + (count_b - count_a)
     end
   end
 
-  ---@param bufnr integer
-  ---@param formatted string[]
-  function diffpatch(bufnr, formatted)
+  ---@param a_bufnr integer
+  ---@param b_path string
+  function diffpatch(a_bufnr, b_path)
+    local b_lines = fn.tolist(io.lines(b_path))
+
     local hunks
     do
-      local a = table.concat(buflines.all(bufnr), "\n")
-      local b = table.concat(formatted, "\n")
+      local a = buflines.joined(a_bufnr)
+      local b = table.concat(b_lines, "\n")
       hunks = vim.diff(a, b, { result_type = "indices" })
       if #hunks == 0 then return jelly.debug("no need to patch") end
     end
 
-    ctx.bufviews(bufnr, function()
-      ctx.undoblock(bufnr, function() patch(bufnr, formatted, hunks) end)
+    ctx.bufviews(a_bufnr, function()
+      ctx.undoblock(a_bufnr, function() patch(a_bufnr, b_lines, hunks) end)
     end)
   end
 end
@@ -196,11 +198,7 @@ function M.morph(bufnr, ft, profile)
   end
 
   do -- sync back & save
-    local formatted = {}
-    for line in io.lines(tmpfpath) do
-      table.insert(formatted, line)
-    end
-    diffpatch(bufnr, formatted)
+    diffpatch(bufnr, tmpfpath)
     ctx.buf(bufnr, function() ex.eval("silent write") end)
     regulator:update(bufnr)
   end
