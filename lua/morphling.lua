@@ -12,8 +12,8 @@ local buflines = require("infra.buflines")
 local ctx = require("infra.ctx")
 local dictlib = require("infra.dictlib")
 local ex = require("infra.ex")
-local fn = require("infra.fn")
 local fs = require("infra.fs")
+local itertools = require("infra.itertools")
 local jelly = require("infra.jellyfish")("morphling")
 local listlib = require("infra.listlib")
 local prefer = require("infra.prefer")
@@ -98,10 +98,10 @@ do
     { "c", "default", { "clang-format" } },
     { "fish", "default", { "fish-indent" } },
   }
-  for ft, profile_name, prog_names in listlib.iter_unpacked(defines) do
+  for ft, profile_name, prog_names in listlib.itern(defines) do
     if profiles[ft] == nil then profiles[ft] = {} end
     if profiles[ft][profile_name] ~= nil then error("duplicate definitions for profile " .. profile_name) end
-    profiles[ft][profile_name] = fn.tolist(fn.map(function(name) return { name, assert(programs[name]) } end, prog_names))
+    profiles[ft][profile_name] = itertools.tolist(itertools.map(function(name) return { name, assert(programs[name]) } end, prog_names))
   end
 end
 
@@ -116,7 +116,7 @@ do
   ---@param hunks morphling.DiffHunk[]
   local function patch(a_bufnr, b_lines, hunks)
     local offset = 0
-    for start_a, count_a, start_b, count_b in listlib.iter_unpacked(hunks) do
+    for start_a, count_a, start_b, count_b in listlib.itern(hunks) do
       assert(not (count_a == 0 and count_b == 0))
 
       local lines
@@ -124,7 +124,7 @@ do
         lines = {}
       else
         local start = start_b
-        lines = fn.tolist(fn.slice(b_lines, start, start + count_b))
+        lines = itertools.tolist(itertools.slice(b_lines, start, start + count_b))
       end
 
       do
@@ -149,7 +149,7 @@ do
   ---@param a_bufnr integer
   ---@param b_path string
   function diffpatch(a_bufnr, b_path)
-    local b_lines = fn.tolist(io.lines(b_path))
+    local b_lines = itertools.tolist(io.lines(b_path))
 
     local hunks
     do
@@ -189,7 +189,7 @@ function M.morph(bufnr, ft, profile)
   end
 
   --progs pipeline against tmpfile
-  for name, prog in listlib.iter_unpacked(progs) do
+  for name, prog in listlib.itern(progs) do
     if not prog(tmpfpath) then
       jelly.warn("failed to run %s", name)
       subprocess.tail_logs()
