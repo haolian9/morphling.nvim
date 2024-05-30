@@ -22,7 +22,7 @@ local Regulator = require("infra.Regulator")
 local subprocess = require("infra.subprocess")
 
 local api = vim.api
-local uv = vim.loop
+local uv = vim.uv
 
 local resolve_stylua_config
 do
