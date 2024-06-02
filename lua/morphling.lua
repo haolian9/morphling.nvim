@@ -15,7 +15,6 @@ local ex = require("infra.ex")
 local fs = require("infra.fs")
 local itertools = require("infra.itertools")
 local jelly = require("infra.jellyfish")("morphling")
-local listlib = require("infra.listlib")
 local prefer = require("infra.prefer")
 local project = require("infra.project")
 local Regulator = require("infra.Regulator")
@@ -98,7 +97,7 @@ do
     { "c", "default", { "clang-format" } },
     { "fish", "default", { "fish-indent" } },
   }
-  for ft, profile_name, prog_names in listlib.itern(defines) do
+  for ft, profile_name, prog_names in itertools.itern(defines) do
     if profiles[ft] == nil then profiles[ft] = {} end
     if profiles[ft][profile_name] ~= nil then error("duplicate definitions for profile " .. profile_name) end
     profiles[ft][profile_name] = itertools.tolist(itertools.map(function(name) return { name, assert(programs[name]) } end, prog_names))
@@ -109,14 +108,14 @@ local diffpatch
 do
   ---ref: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
 
-  ---@alias morphling.DiffHunk {[1]: integer, [2]: integer, [3]: integer, [4]: integer}
+  ---@alias morphling.DiffHunk [integer,integer,integer,integer]
 
   ---@param a_bufnr integer
   ---@param b_lines string[]
   ---@param hunks morphling.DiffHunk[]
   local function patch(a_bufnr, b_lines, hunks)
     local offset = 0
-    for start_a, count_a, start_b, count_b in listlib.itern(hunks) do
+    for start_a, count_a, start_b, count_b in itertools.itern(hunks) do
       assert(not (count_a == 0 and count_b == 0))
 
       local lines
@@ -155,6 +154,7 @@ do
     do
       local a = buflines.joined(a_bufnr)
       local b = table.concat(b_lines, "\n")
+      ---@type morphling.DiffHunk
       hunks = vim.diff(a, b, { result_type = "indices" })
       if #hunks == 0 then return jelly.debug("no need to patch") end
     end
@@ -189,7 +189,7 @@ function M.morph(bufnr, ft, profile)
   end
 
   --progs pipeline against tmpfile
-  for name, prog in listlib.itern(progs) do
+  for name, prog in itertools.itern(progs) do
     if not prog(tmpfpath) then
       jelly.warn("failed to run %s", name)
       subprocess.tail_logs()
