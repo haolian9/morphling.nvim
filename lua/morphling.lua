@@ -85,7 +85,7 @@ local programs = {
 }
 
 --{ft: {profile: [(program-name, program-handler)]}}
----@type {[string]: {[string]: {[1]: string, [2]: morphling.Program}[]}}
+---@type {[string]: {[string]: [string,morphling.Program][]}}
 local profiles = {}
 do
   local defines = {
