@@ -14,7 +14,9 @@ local dictlib = require("infra.dictlib")
 local ex = require("infra.ex")
 local fs = require("infra.fs")
 local itertools = require("infra.itertools")
+local its = require("infra.its")
 local jelly = require("infra.jellyfish")("morphling")
+local listlib = require("infra.listlib")
 local prefer = require("infra.prefer")
 local project = require("infra.project")
 local Regulator = require("infra.Regulator")
@@ -100,7 +102,7 @@ do
   for ft, profile_name, prog_names in itertools.itern(defines) do
     if profiles[ft] == nil then profiles[ft] = {} end
     if profiles[ft][profile_name] ~= nil then error("duplicate definitions for profile " .. profile_name) end
-    profiles[ft][profile_name] = itertools.tolist(itertools.map(function(name) return { name, assert(programs[name]) } end, prog_names))
+    profiles[ft][profile_name] = its(prog_names):map(function(name) return { name, assert(programs[name]) } end):tolist()
   end
 end
 
@@ -123,7 +125,7 @@ do
         lines = {}
       else
         local start = start_b
-        lines = itertools.tolist(itertools.slice(b_lines, start, start + count_b))
+        lines = listlib.slice(b_lines, start, start + count_b)
       end
 
       do
