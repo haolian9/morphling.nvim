@@ -15,6 +15,7 @@ local ex = require("infra.ex")
 local fs = require("infra.fs")
 local itertools = require("infra.itertools")
 local its = require("infra.its")
+local iuv = require("infra.iuv")
 local jelly = require("infra.jellyfish")("morphling")
 local listlib = require("infra.listlib")
 local prefer = require("infra.prefer")
@@ -23,7 +24,6 @@ local Regulator = require("infra.Regulator")
 local subprocess = require("infra.subprocess")
 
 local api = vim.api
-local uv = vim.uv
 
 local resolve_stylua_config
 do
@@ -206,7 +206,7 @@ function M.morph(bufnr, ft, profile)
   end
 
   -- cleanup
-  uv.fs_unlink(tmpfpath)
+  iuv.fs_unlink(tmpfpath)
 end
 
 M.comp = {
