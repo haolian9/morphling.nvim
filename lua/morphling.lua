@@ -18,12 +18,11 @@ local its = require("infra.its")
 local iuv = require("infra.iuv")
 local jelly = require("infra.jellyfish")("morphling")
 local listlib = require("infra.listlib")
+local ni = require("infra.ni")
 local prefer = require("infra.prefer")
 local project = require("infra.project")
 local Regulator = require("infra.Regulator")
 local subprocess = require("infra.subprocess")
-
-local api = vim.api
 
 local resolve_stylua_config
 do
@@ -173,7 +172,7 @@ local regulator = Regulator(1024)
 ---@param ft? string
 ---@param profile? string
 function M.morph(bufnr, ft, profile)
-  bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or ni.get_current_buf()
   if regulator:throttled(bufnr) then return jelly.debug("no change") end
 
   ft = ft or prefer.bo(bufnr, "filetype")
