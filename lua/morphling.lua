@@ -123,7 +123,7 @@ do
       if count_b == 0 then
         lines = {}
       else
-        local start = start_b
+        local start = start_b - 1
         lines = listlib.slice(b_lines, start, start + count_b)
       end
 
