@@ -9,6 +9,7 @@ local M = {}
 
 local cthulhu = require("cthulhu")
 local buflines = require("infra.buflines")
+local BufTickRegulator = require("infra.BufTickRegulator")
 local ctx = require("infra.ctx")
 local dictlib = require("infra.dictlib")
 local ex = require("infra.ex")
@@ -21,7 +22,6 @@ local listlib = require("infra.listlib")
 local ni = require("infra.ni")
 local prefer = require("infra.prefer")
 local project = require("infra.project")
-local Regulator = require("infra.Regulator")
 local subprocess = require("infra.subprocess")
 
 local resolve_stylua_config
@@ -166,7 +166,7 @@ do
   end
 end
 
-local regulator = Regulator(1024)
+local regulator = BufTickRegulator(1024)
 
 ---@param bufnr? integer
 ---@param ft? string
