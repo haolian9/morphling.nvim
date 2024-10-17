@@ -19,6 +19,7 @@ local its = require("infra.its")
 local iuv = require("infra.iuv")
 local jelly = require("infra.jellyfish")("morphling")
 local listlib = require("infra.listlib")
+local mi = require("infra.mi")
 local ni = require("infra.ni")
 local prefer = require("infra.prefer")
 local project = require("infra.project")
@@ -34,7 +35,7 @@ do
     end
   end
 
-  local function resolve() return find(project.git_root()) or find(project.working_root()) or find(vim.fn.stdpath("config")) end
+  local function resolve() return find(project.git_root()) or find(project.working_root()) or find(mi.stdpath("config")) end
 
   local found
   ---@return string?
